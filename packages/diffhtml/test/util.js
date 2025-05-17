@@ -5,7 +5,7 @@ import createTree from '../lib/tree/create';
 import { NodeCache } from '../lib/util/types';
 import decodeEntities from '../lib/util/decode-entities';
 import escape from '../lib/util/escape';
-import parse, { openComment, closeComment, openTag, closeTag, attribute, text } from '../lib/util/parse';
+import parse, { openComment, closeComment, openTag, closeTag, attribute, text, execAttribute } from '../lib/util/parse';
 import _process from '../lib/util/process';
 import { protectVTree, unprotectVTree, gc } from '../lib/util/memory';
 import makeMeasure from '../lib/util/make-measure';
@@ -378,6 +378,33 @@ describe('Util', () => {
 
       strictEqual(output[0], 'test=__DIFFHTML_TOKEN_1__');
       strictEqual(output.index, 0);
+    });
+
+    it('execAttribute matches normal regex output', () => {
+      const input = 'attr="value">';
+      attribute.lastIndex = 0;
+      const direct = attribute.exec(input);
+      const result = execAttribute(input, 0);
+      strictEqual(result[0], direct[0]);
+      strictEqual(result.index, 0);
+    });
+
+    it('execAttribute handles extremely large attributes', () => {
+      const huge = 'data="' + 'a'.repeat(5_000_000) + '">';
+
+      let threw = false;
+      attribute.lastIndex = 0;
+      try {
+        attribute.exec(huge);
+      } catch (e) {
+        if (e instanceof RangeError) threw = true;
+      }
+
+      strictEqual(threw, true);
+
+      const res = execAttribute(huge, 0);
+      strictEqual(res.index, 0);
+      strictEqual(res[0].length, huge.length - 1);
     });
 
     it('will match text', () => {
