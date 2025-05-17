@@ -14,6 +14,24 @@ const blocklist = new Set();
 const allowlist = new Set();
 
 /**
+ * Inserts or moves a node before the reference node. Uses the new
+ * `moveBefore` DOM API when available to preserve element state.
+ * Falls back to `insertBefore` if `moveBefore` is not supported.
+ *
+ * @param {Node & { moveBefore?: Function }} parent
+ * @param {Node} newNode
+ * @param {Node?} refNode
+ */
+const insertOrMoveBefore = (parent, newNode, refNode) => {
+  if (typeof parent.moveBefore === 'function') {
+    parent.moveBefore(newNode, refNode || null);
+  }
+  else {
+    parent.insertBefore(newNode, refNode || null);
+  }
+};
+
+/**
  * Sets an attribute on an element.
  *
  * @param {VTree} vTree
@@ -210,9 +228,8 @@ export default function patchNode(patches, state = EMPTY.OBJ) {
           createNode(newTree, ownerDocument, isSVG)
         );
 
-        // If refNode is `undefined` then it will simply append like
-        // `appendChild`.
-        domNode.insertBefore(newNode, refNode || null);
+        // If refNode is `undefined` then this will append like `appendChild`.
+        insertOrMoveBefore(domNode, newNode, refNode || null);
 
         break;
       }
@@ -240,7 +257,7 @@ export default function patchNode(patches, state = EMPTY.OBJ) {
         // This is due to the `connectedCallback` in Web Components firing off,
         // and possibly causing a `gc()` to wipe this out.
         protectVTree(newTree);
-        oldDomNode.parentNode.insertBefore(newDomNode, oldDomNode);
+        insertOrMoveBefore(oldDomNode.parentNode, newDomNode, oldDomNode);
         oldDomNode.parentNode.removeChild(oldDomNode);
         unprotectVTree(oldTree);
 
