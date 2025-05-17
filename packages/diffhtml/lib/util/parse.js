@@ -94,6 +94,68 @@ function removeQuotes(value) {
 }
 
 /**
+ * Execute the `attribute` RegExp with a fallback for extremely large
+ * attributes which may cause the regular expression engine to exceed the
+ * call stack limit. When a `RangeError` is thrown during execution this
+ * function will attempt to manually parse the attribute substring.
+ *
+ * @param {string} html
+ * @param {number} start
+ * @return {{0:string,index:number}|null}
+ */
+export function execAttribute(html, start) {
+  attribute.lastIndex = start;
+
+  try {
+    return attribute.exec(html);
+  }
+  catch (e) {
+    if (!(e instanceof RangeError)) {
+      throw e;
+    }
+
+    let i = start;
+    let result = '';
+    let quote = '';
+
+    // Capture leading whitespace
+    while (i < html.length && (html[i] === ' ' || html[i] === '\n')) {
+      result += html[i++];
+    }
+
+    for (; i < html.length; i++) {
+      const ch = html[i];
+
+      if (quote) {
+        result += ch;
+        if (ch === quote) {
+          quote = '';
+        }
+        continue;
+      }
+
+      if (ch === '"' || ch === "'") {
+        quote = ch;
+        result += ch;
+        continue;
+      }
+
+      if (ch === '>' || ch === '\n' || ch === ' ') {
+        break;
+      }
+
+      if (ch === '/' && html[i + 1] === '>') {
+        break;
+      }
+
+      result += ch;
+    }
+
+    return result ? { 0: result, index: start } : null;
+  }
+}
+
+/**
  * Parses HTML and returns a root element
  *
  * @param {String} html - String of HTML markup to parse into a Virtual Tree
@@ -297,10 +359,10 @@ export default function parse(html, options = {}) {
     }
 
     // Attributes.
-    const {
-      0: fullAttributeMatch,
-      index: attributeIndex,
-    } = attribute.exec(html) || EMPTY.OBJ;
+      const {
+        0: fullAttributeMatch,
+        index: attributeIndex,
+      } = execAttribute(html, i) || EMPTY.OBJ;
 
     const attributeMatchTrim = attributeIndex === i && fullAttributeMatch.trim();
 
